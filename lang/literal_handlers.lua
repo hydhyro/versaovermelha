@@ -63,4 +63,49 @@ return function(mod)
     end,
   })
   
+
+---
+mod.content.map_scripts:register("ROUTE_24", {
+  talk = {
+    ["TEXT_ROUTE24_COOLTRAINER_M1"] = function(game, ow, npc, done)
+      if game.save.flags["EVENT_BEAT_ROUTE24_ROCKET"] then
+        game.stack:push(TextBox.new(game, "Com essa aptidão,\nvocê poderia ser\vum grande líder\vna EQUIPE ROCKET!", done))
+        return
+      end
+
+      local function start_battle()
+        mod.log:info("--- DEBUG: Avvio battaglia con ow:engageTrainer ---")
+        if ow and type(ow.engageTrainer) == "function" then
+          -- Segna come sconfitto per evitare futuri combattimenti futuri
+          game.save.flags["EVENT_BEAT_ROUTE24_ROCKET"] = true
+          ow:engageTrainer(npc, done)
+        else
+          done()
+        end
+      end
+
+      local function ask_join()
+        game.stack:push(TextBox.new(game, "Aproveitando, que\ntal se juntar a\vEQUIPE ROCKET?\fSomos um grupo que\nse dedica ao mal\vusando POKéMON!\fQuer entrar?", function()
+          game.stack:push(ChoiceBox.new(game, function(yes)
+            game.stack:push(TextBox.new(game, "Tem certeza?\nNão?\fQual é, se\njunte a nós!\fEstou mandando\nvocê participar!\fTá, você precisa\nser convencido!", function()
+              start_battle()
+            end))
+          end))
+        end))
+      end
+
+      if not game.save.flags["EVENT_GOT_NUGGET"] then
+        game.stack:push(TextBox.new(game, "Parabéns!\nVocê derrotou os\v5 competidores!\fE ganhou um prêmio\nfabuloso!", function()
+          game.save.inventory["NUGGET"] = (game.save.inventory["NUGGET"] or 0) + 1
+          game.save.flags["EVENT_GOT_NUGGET"] = true
+          game.stack:push(TextBox.new(game, "{PLAYER} ganhou\numa PEPITA!", function()
+            ask_join()
+          end))
+        end))
+      else
+        ask_join()
+      end
+    end,
+  },
+})
 end
