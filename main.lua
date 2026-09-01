@@ -332,9 +332,6 @@ end
 local oldTrainerCardDraw = TrainerCard.draw
 
 TrainerCard.draw = function(self, ...)
-    if not mod.exports.trainer_card then
-        return oldTrainerCardDraw(self, ...)
-    end
 
     local oldDraw = Font.draw
     local oldGfxDraw = love.graphics.draw
