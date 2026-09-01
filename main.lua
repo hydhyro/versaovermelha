@@ -18,41 +18,8 @@ local Theme = require("src.ui.Theme")
 local TrainerCard = require("src.ui.TrainerCard")
 local Badges = require("src.inventory.Badges")
 
+
 return function(mod)
-
-  local compile = loadstring or load
-
-  local source, err = mod:read("vr_options.lua")
-  if not source then
-    mod.log:error("cannot read vr_options.lua: %s", tostring(err))
-    return
-  end
-
-  local chunk, err = compile(
-    source,
-    "@" .. mod.path .. "/vr_options.lua"
-  )
-
-  if not chunk then
-    mod.log:error("cannot compile vr_options.lua: %s", tostring(err))
-    return
-  end
-
-  local options = chunk()
-  options.install(mod)
--- Carrega as opções persistentes para o restante do mod.
-mod.exports.idioma_golpes =
-    mod.options:get("idioma_golpes")
-
-mod.exports.mostrar_inimigo =
-    mod.options:get("mostrar_inimigo")
-
-mod.exports.precos_linha =
-    mod.options:get("precos_linha")
-
-mod.exports.trainer_card =
-    mod.options:get("trainer_card")
-
   -- mod:read is the supported way into your own directory; the catalogs are
   -- plain Lua tables, so read and run them rather than require()ing them.
   local function catalog(name)
@@ -99,10 +66,7 @@ mod.exports.trainer_card =
       page.image = mod.assets:path(page.image)
     end
     mod.content.font:register(id, page)
-	-- mod.content.font:register("ttf", {
-    -- file = mod.assets:path("assets/fonts/plainpixel/Prop10.ttf"),
-    -- size = 10,
-    --})
+	--mod.content.font:register("ttf", {})
   end
   -- charmap: which byte sequence draws which code
   for seq, code in pairs(catalog("charmap")) do
@@ -117,48 +81,12 @@ mod.exports.trainer_card =
   counts.strings = each("strings", function(source, value)
     mod.content.strings:override(source, value)
   end)
-  local mostrarInimigo = mod.options:get("mostrar_inimigo")
-
-if mostrarInimigo then
-  mod.content.strings:override("Enemy %s", "%s inimigo ")
-  mod.content.strings:override("%s\nused %s!", "%s\nusou %s!")
-else
-  mod.content.strings:override("Enemy %s", "%s")
-  mod.content.strings:override("%s\nused %s!", "%s usou\n%s!")
-end
-
-  
-  
   counts.species = each("species_names", function(id, value)
     mod.content.pokemon:patch(id, { name = value })
   end)
- ---------------
- 
- 
-
--- Se for true, faz a alteração nos golpes
-
-local idioma = mod.options:get("idioma_golpes")
-
-if idioma == "portuguese1" then
-
-    counts.moves = each("move_names", function(id, value)
-        mod.content.moves:patch(id, { name = value })
-    end)
-
-elseif idioma == "portuguese2" then
-
-    counts.moves = each("move_names2", function(id, value)
-        mod.content.moves:patch(id, { name = value })
-    end)
-
-end
-
-
-
-  
-  
- ------------ 
+  counts.moves = each("move_names", function(id, value)
+    mod.content.moves:patch(id, { name = value })
+  end)
   counts.items = each("item_names", function(id, value)
     mod.content.items:patch(id, { name = value })
   end)
@@ -188,16 +116,207 @@ end
     for _, n in pairs(counts) do total = total + n end
     mod.log:info("Português: %d strings traduzidas", total)
   end)
-  
-  
-  
- 
-  
-  
-  
--------------------------------------------------------------------------
+
+
+
+--------------------------------------------------------------
+----------------------BATTLE UI
+--------------------------------------------------------------
+local oldDrawTextArea = BattleState.drawTextArea
+
+BattleState.drawTextArea = function(self, ...)
+    local oldDraw = Font.draw
+    local oldDrawCode = Font.drawCode
+	local oldDrawBox = Font.drawBox
+
+    Font.draw = function(text, x, y, ...)
+        if x == 48 and y >= 104 and y <= 128 then
+        x = 16	
+			
+        end
+
+        return oldDraw(text, x, y, ...)
+    end
+
+    Font.drawCode = function(code, x, y, ...)
+		--CURSORES DE GOLPES
+		if code == 0xED and x == 40 and y == 104 then
+            x = 08
+            y = 104
+		elseif code == 0xED and x == 40 and y == 112 then
+            x = 08
+            y = 112
+		elseif code == 0xED and x == 40 and y == 120 then
+            x = 08
+            y = 120
+		elseif code == 0xED and x == 40 and y == 128 then
+            x = 08
+            y = 128
+		elseif code == 0xEC and x == 40 and y == 104 then
+            x = 08
+            y = 104				
+		elseif code == 0xEC and x == 40 and y == 112 then
+            x = 08
+            y = 112
+		elseif code == 0xEC and x == 40 and y == 120 then
+            x = 08
+            y = 120
+		elseif code == 0xEC and x == 40 and y == 128 then
+            x = 08
+            y = 128		
+	--CURSORES DE MIMIC
+        end
+        return oldDrawCode(code, x, y, ...)
+    end
+	Font.drawBox = function(x, y, w, h, ...)
+		
+--MOVELIST BOX Font.drawBox(4, 12, 16, 6)			
+			if x == 4 and y == 12 and w == 16 and h == 6 then
+			x = 0
+			y = 12
+			w = 20
+			h = 6
+--MOVELIST TYPE BOX Font.drawBox(0, 8, 11, 5)			
+			--elseif x == 0 and y == 8 and w == 11 and h == 5 then
+			--x = 0
+			--y = 8
+			--w = 11
+			--h = 5			
+--MIMIC BOX Font.drawBox(0, 7, 16, 6)			
+			elseif x == 0 and y == 7 and w == 16 and h == 6 then
+			x = 0
+			y = 7
+			w = 20
+			h = 6
+--MOVE LEARN BOX Font.drawBox(0, 5, 20, 7)			
+			elseif x == 4 and y == 5 and w == 16 and h == 7 then
+			x = 0
+			y = 5
+			w = 20
+			h = 7
+    end
+
+	
+	
+
+    return oldDrawBox(x, y, w, h, ...)
+end
+
+
+    local ok, a, b, c, d, e = pcall(oldDrawTextArea, self, ...)
+
+	
+	Font.drawBox = oldDrawBox
+    Font.draw = oldDraw
+    Font.drawCode = oldDrawCode
+
+    if not ok then
+        error(a)
+    end
+
+    return a, b, c, d, e
+end
+----------------------------------------------
+----LEARN MOVE BOX
+----------------------------------------------
+local oldMoveLearnDraw = MoveLearnMenu.draw
+
+MoveLearnMenu.draw = function(self, ...)
+    local oldDraw = Font.draw
+    local oldDrawCode = Font.drawCode
+    local oldDrawBox = Font.drawBox
+
+    Font.draw = function(text, x, y, ...)
+        -- Nomes dos golpes
+        if x == 48 and y >= 48 and y <= 128 then
+            x = 16
+        -- CANCEL
+        elseif text == Strings("CANCEL") and x == 48 then
+            x = 16
+        end
+
+        return oldDraw(text, x, y, ...)
+    end
+
+    Font.drawCode = function(code, x, y, ...)
+        -- Cursor da lista
+        if code == 0xED and x == 40 then
+        x = 8
+		end
+
+        return oldDrawCode(code, x, y, ...)
+    end
+
+    Font.drawBox = function(x, y, w, h, ...)
+        -- Caixa da lista de golpes
+        if x == 4 and y == 7 and w == 16 and h == 6 then
+            x = 0
+            y = 7
+            w = 20
+            h = 6
+        end
+
+        return oldDrawBox(x, y, w, h, ...)
+    end
+
+    local ok, a, b, c, d, e = pcall(oldMoveLearnDraw, self, ...)
+
+    Font.draw = oldDraw
+    Font.drawCode = oldDrawCode
+    Font.drawBox = oldDrawBox
+
+    if not ok then
+        error(a)
+    end
+
+    return a, b, c, d, e
+
+end
+
+-------------------------------------------------------------------
+ --TABELA DE TIPOS
+ -------------------------------------------------------------------
+ -- Injected: localized type display names from generated lang/type_names.lua
+  -- Type names stay English in the type_chart registry so third-party
+  -- mods that key colors/UI off TypeChart.displayName keep resolving,
+  -- and are localized at draw time instead: every engine site renders
+  -- the type name as a standalone Font.draw string, which is substituted
+  -- below.
+  local okType, TypeChart = pcall(require, "src.battle.TypeChart")
+  local by_english = {}
+  counts.type_names = each("type_names", function(typeId, localized)
+    if okType and TypeChart and type(TypeChart.displayName) == "function" then
+      local canonical = TypeChart.displayName(typeId)
+      if type(canonical) == "string" and canonical ~= "" and canonical ~= localized then
+        by_english[canonical] = localized
+      end
+    end
+  end)
+  if next(by_english) then
+    local okFont, Font = pcall(require, "src.render.Font")
+    if okFont and type(Font) == "table" then
+      local function localize(text)
+        if type(text) ~= "string" then return text end
+        local localized = by_english[text]
+        return type(localized) == "string" and localized or text
+      end
+      if type(Font.split) == "function" then
+        local original_split = Font.split
+        Font.split = function(text)
+          return original_split(localize(text))
+        end
+      end
+      if type(Font.draw) == "function" then
+        local original_draw = Font.draw
+        Font.draw = function(text, x, y, ...)
+          return original_draw(localize(text), x, y, ...)
+        end
+      end
+    end
+  end
+--- =========================================
   -- Traduções Literais
--------------------------------------------------------------------------  
+--- ========================================= 
   local literal_body = mod:read("lang/literal_handlers.lua")
   if literal_body then
     local chunk, err = loadstring(literal_body, "lang/literal_handlers.lua")
@@ -206,11 +325,8 @@ end
     if type(setup) ~= "function" then error("literal_handlers.lua must return a function") end
     setup(mod)
   end
--------------------------------------------------------------------------
-  -- Correção do Inventário, Preços e Quantidades na linha debaixo
 
-
---- ==========================================
+--- =========================================
 -- Cartão de Treinador
 -- ==========================================
 local oldTrainerCardDraw = TrainerCard.draw
@@ -313,226 +429,156 @@ TrainerCard.draw = function(self, ...)
     return a, b, c, d, e
 end
 
---------------------------------------------------------------
-----------------------BATTLE UI
---------------------------------------------------------------
-local oldDrawTextArea = BattleState.drawTextArea
+--- =========================================
+--- TITLE SCREEN VERSION LOGO
+--- =========================================
+ local TitleState = require("src.ui.TitleState")
 
-BattleState.drawTextArea = function(self, ...)
-    local oldDraw = Font.draw
-    local oldDrawCode = Font.drawCode
-	local oldDrawBox = Font.drawBox
+local oldDraw = TitleState.draw
 
-    Font.draw = function(text, x, y, ...)
-        if text == Strings("FIGHT", "battle") and x == 80 and y == 112 then
-            x = 56
-            y = 112
+TitleState.draw = function(self)
+  oldDraw(self)
 
-        elseif text == Strings("ITEM", "battle") and x == 80 and y == 128 then
-            x = 56
-            y = 128
+  if self.version
+     and not self.yellowLayout
+     and self.phase ~= "drop"
+     and self.phase ~= "settle" then
 
-        elseif text == Strings("RUN", "battle") and x == 128 and y == 128 then
-            x = 112
-            y = 128
-		--LISTA DE GOLPES	
-		elseif x == 48 and y >= 104 and y <= 128 then
-        x = 16	
-			
-        end
+    local iw, ih = self.version:getDimensions()
+    local rx = self.ribbonOffset or 0
 
-        return oldDraw(text, x, y, ...)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle(
+      "fill",
+      40 + rx,
+      64,
+      104,
+      8
+    )
+
+    if self.blue then
+      -- BLUE:
+      love.graphics.draw(
+        self.version,
+        love.graphics.newQuad(88, 0, 72, 8, iw, ih),
+        48 + rx,
+        64
+      )
+    else
+      -- RED:
+      love.graphics.draw(
+        self.version,
+        love.graphics.newQuad(0, 0, 88, 8, iw, ih),
+        40 + rx,
+        64
+      )
     end
+  end
 
-    Font.drawCode = function(code, x, y, ...)
-	--PKMN
-        if code == 0xE1 and x == 128 and y == 112 then
-            x = 112
-            y = 112
-
-        elseif code == 0xE2 and x == 136 and y == 112 then
-            x = 120
-            y = 112
-	--CURSORES DE BATALHA
-        elseif code == 0xED and x == 72 and y == 112 then
-            x = 48
-            y = 112
-        elseif code == 0xED and x == 120 and y == 112 then
-            x = 104
-            y = 112			
-        elseif code == 0xED and x == 72 and y == 128 then
-            x = 48
-            y = 128			
-        elseif code == 0xED and x == 120 and y == 128 then
-            x = 104
-            y = 128	
-	--CURSORES DE GOLPES
-			elseif code == 0xED and x == 40 and y == 104 then
-            x = 08
-            y = 104
-		elseif code == 0xED and x == 40 and y == 112 then
-            x = 08
-            y = 112
-		elseif code == 0xED and x == 40 and y == 120 then
-            x = 08
-            y = 120
-		elseif code == 0xED and x == 40 and y == 128 then
-            x = 08
-            y = 128
-		elseif code == 0xEC and x == 40 and y == 104 then
-            x = 08
-            y = 104				
-		elseif code == 0xEC and x == 40 and y == 112 then
-            x = 08
-            y = 112
-		elseif code == 0xEC and x == 40 and y == 120 then
-            x = 08
-            y = 120
-		elseif code == 0xEC and x == 40 and y == 128 then
-            x = 08
-            y = 128		
-	--CURSORES DE MIMIC
-	
-			
-        end
-		
-		
-		
-		
-		
-
-        return oldDrawCode(code, x, y, ...)
-    end
---FIGHT/PKMN/ITEM/RUN BOX
-	Font.drawBox = function(x, y, w, h, ...)
-			if x == 8 and y == 12 and w == 12 and h == 6 then
-			x = 5
-			y = 12
-			w = 15
-			h = 6
---MOVELIST BOX Font.drawBox(4, 12, 16, 6)			
-			elseif x == 4 and y == 12 and w == 16 and h == 6 then
-			x = 0
-			y = 12
-			w = 20
-			h = 6
---MOVELIST TYPE BOX Font.drawBox(0, 8, 11, 5)			
-			--elseif x == 0 and y == 8 and w == 11 and h == 5 then
-			--x = 0
-			--y = 8
-			--w = 11
-			--h = 5			
---MIMIC BOX Font.drawBox(0, 7, 16, 6)			
-			elseif x == 0 and y == 7 and w == 16 and h == 6 then
-			x = 0
-			y = 7
-			w = 20
-			h = 6
---MOVE LEARN BOX Font.drawBox(0, 5, 20, 7)			
-			elseif x == 4 and y == 5 and w == 16 and h == 7 then
-			x = 0
-			y = 5
-			w = 20
-			h = 7
-    end
-
-	
-	
-
-    return oldDrawBox(x, y, w, h, ...)
+  love.graphics.setColor(1, 1, 1, 1)
 end
-
-
-    local ok, a, b, c, d, e = pcall(oldDrawTextArea, self, ...)
-
-	
-	Font.drawBox = oldDrawBox
-    Font.draw = oldDraw
-    Font.drawCode = oldDrawCode
-
-    if not ok then
-        error(a)
-    end
-
-    return a, b, c, d, e
-end
-
-----------------------------------------------
-----LEARN MOVE BOX
-----------------------------------------------
-local oldMoveLearnDraw = MoveLearnMenu.draw
-
-MoveLearnMenu.draw = function(self, ...)
+--- =========================================
+--- GAME CORNER BOX
+--- =========================================
+    local Font = require("src.render.Font")
     local oldDraw = Font.draw
-    local oldDrawCode = Font.drawCode
     local oldDrawBox = Font.drawBox
 
     Font.draw = function(text, x, y, ...)
-        -- Nomes dos golpes
-        if x == 48 and y >= 48 and y <= 128 then
-            x = 16
-        -- CANCEL
-        elseif text == Strings("CANCEL") and x == 48 then
-            x = 16
+        if text == Strings("MONEY") and x == 96 and y == 16 then
+            x = 88
+        elseif text == Strings("COIN") and x == 96 and y == 32 then
+            x = 88
         end
-
         return oldDraw(text, x, y, ...)
     end
 
-    Font.drawCode = function(code, x, y, ...)
-        -- Cursor da lista
-        if code == 0xED and x == 40 then
-        x = 8
-		end
-
-        return oldDrawCode(code, x, y, ...)
-    end
-
     Font.drawBox = function(x, y, w, h, ...)
-        -- Caixa da lista de golpes
-        if x == 4 and y == 5 and w == 16 and h == 7 then
-            x = 0
-            y = 5
-            w = 20
-            h = 7
+        if x == 11 and y == 0 and w == 9 and h == 7 then
+            w = 10
+			x = 10
         end
-
         return oldDrawBox(x, y, w, h, ...)
     end
+--- =========================================
+--- METRIC POKéDEX
+--- =========================================
+local DexExtra = catalog("dex_extra")
 
-    local ok, a, b, c, d, e = pcall(oldMoveLearnDraw, self, ...)
+local DexEntryMenu = require("src.ui.DexEntryMenu")
+local oldDexEntryNew = DexEntryMenu.new
 
-    Font.draw = oldDraw
-    Font.drawCode = oldDrawCode
-    Font.drawBox = oldDrawBox
+DexEntryMenu.new = function(game, speciesOrOpts, onDone)
+    for species, extra in pairs(DexExtra) do
+        local pokemon = game.data.pokemon[species]
 
-    if not ok then
-        error(a)
+        if pokemon and pokemon.dexEntry then
+            pokemon.dexEntry.heightM = extra.heightM
+            pokemon.dexEntry.weightKg = extra.weightKg
+        end
     end
-
-    return a, b, c, d, e
+    return oldDexEntryNew(game, speciesOrOpts, onDone)
 end
-
 ----------------------------------------
---INVENTÁRIO - QUEBRA DE LINHA
+--INVENTÁRIO -
 ----------------------------------------
 local oldListMenuDraw = ListMenu.draw
 
 ListMenu.draw = function(self, ...)
     local oldDraw = Font.draw
+    local oldDrawCode = Font.drawCode
+    local oldDrawBox = Font.drawBox
+
     local offset = mod.exports.precos_linha and 8 or 0
 
     Font.draw = function(text, x, y, ...)
-        if x == 160 - 8 - Font.width(text) then
-            y = y + offset
+        
+        -- ITEM_NAME_X
+        -- Original: 48
+        -- Novo: 40
+        if x == 48 then
+            x = 40
         end
 
         return oldDraw(text, x, y, ...)
     end
 
+Font.drawCode = function(code, x, y, ...)
+    -- CURSORES DO ITEM MENU
+    if code == Theme.cursor and x == 40 then
+        x = 32
+
+    elseif code == Theme.cursorHollow and x == 40 then
+        x = 32
+    end
+
+    return oldDrawCode(code, x, y, ...)
+end
+
+
+    Font.drawBox = function(x, y, w, h, ...)
+        -- ITEM_BOX
+        -- Original: 4, 2, 16, 11
+        -- Novo: 2, 2, 20, 11
+        if x == 4
+            and y == 2
+            and w == 16
+            and h == 11 then
+
+            x = 3
+            y = 2
+            w = 17
+            h = 11
+        end
+
+        return oldDrawBox(x, y, w, h, ...)
+    end
+
     local ok, a, b, c, d, e = pcall(oldListMenuDraw, self, ...)
 
+    Font.drawBox = oldDrawBox
     Font.draw = oldDraw
+    Font.drawCode = oldDrawCode
 
     if not ok then
         error(a)
@@ -540,7 +586,6 @@ ListMenu.draw = function(self, ...)
 
     return a, b, c, d, e
 end
-
 -------------
 mod.hooks:wrap("ui.party.submenu", function(next, game, items, mon, ctx)
     local result = next(game, items, mon, ctx)
@@ -555,97 +600,44 @@ mod.hooks:wrap("ui.party.submenu", function(next, game, items, mon, ctx)
 
     return result
 end)
-------------------
-------------------
-  local TitleState = require("src.ui.TitleState")
-  local oldDraw = TitleState.draw
 
-  TitleState.draw = function(self)
-    oldDraw(self)
+local OverworldState = require("src.world.OverworldController")
+local TextBox = require("src.render.TextBox")
 
-    if self.version and not self.yellow then
-      local iw, ih = self.version:getDimensions()
+local oldNurseHeal = OverworldState.nurseHeal
+local oldTextBoxNew = TextBox.new
 
-      -- cobre a versão antiga
-      love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.rectangle("fill", 40, 64, 104, 8)
+OverworldState.nurseHeal = function(self, onDone, npc)
+    TextBox.new = function(game, text, onDone, opts)
+        if opts
+            and opts.choiceLabels
+            and opts.choiceBox == Theme.healCancelBox then
 
-      -- desenha a versão na nova ordem/posição
-      if self.blue then
-        love.graphics.draw(
-          self.version,
-          love.graphics.newQuad(88, 0, 72, 8, iw, ih),
-          48, 64
-        )
-      else
-        love.graphics.draw(
-          self.version,
-          love.graphics.newQuad(0, 0, 88, 8, iw, ih),
-          40, 64
-        )
-      end
+            for i, label in ipairs(opts.choiceLabels) do
+                if label == "CANCEL" then
+                    opts.choiceLabels[i] = "SAIR"
+                end
+            end
+        end
+
+        return oldTextBoxNew(game, text, onDone, opts)
     end
 
-    love.graphics.setColor(1, 1, 1, 1)
-  end
+    local ok, a, b, c, d, e = pcall(oldNurseHeal, self, onDone, npc)
 
----yellow
----------------
-  
+    TextBox.new = oldTextBoxNew
 
-  
-local TitleState = require("src.ui.TitleState")
-local oldDraw = TitleState.draw
-local Font = require("src.render.Font")
+    if not ok then
+        error(a)
+    end
 
-TitleState.draw = function(self)
-  oldDraw(self)
-
-local function easeNoOvershoot(t)
-  if t <= 0 then return 0 end
-  if t >= 1 then return 1 end
-
-  local u = t - 1
-  local v = 1 + 2.70158 * u * u * u + 1.70158 * u * u
-
-  return math.min(v, 1)
+    return a, b, c, d, e
 end
 
 
-  if self.yellow then
 
-    -- contador da animação
-    self.__testFrame = (self.__testFrame or 0) + 1
 
-    local f = self.__testFrame
 
-    -- começa em Y=-15 e cai até Y=56
-    -- sem ultrapassar nem voltar
-local t = math.min(1, math.max(0, (f - 4) / 15))
-local y = math.floor(-15 + (56 + 15) * easeNoOvershoot(t))
 
-    local text1 = "VERSÃO"
-    local text2 = "AMARELA"
-
-    local x1 = 10
-    local x2 = 104
-
-    local w1 = Font.width(text1)
-    local w2 = Font.width(text2)
-
-    -- fundos brancos
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("fill", x1, y, w1, 8)
-    love.graphics.rectangle("fill", x2, y, w2, 8)
-
-    -- textos pretos
-    love.graphics.setColor(0, 0, 0, 1)
-    Font.draw(text1, x1, y)
-    Font.draw(text2, x2, y)
-
-    love.graphics.setColor(1, 1, 1, 1)
-  end
-end
-------------------
-------------------
+---
 end
