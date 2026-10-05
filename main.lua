@@ -18,8 +18,41 @@ local Theme = require("src.ui.Theme")
 local TrainerCard = require("src.ui.TrainerCard")
 local Badges = require("src.inventory.Badges")
 
-
 return function(mod)
+
+  local compile = loadstring or load
+
+  local source, err = mod:read("vr_options.lua")
+  if not source then
+    mod.log:error("cannot read vr_options.lua: %s", tostring(err))
+    return
+  end
+
+  local chunk, err = compile(
+    source,
+    "@" .. mod.path .. "/vr_options.lua"
+  )
+
+  if not chunk then
+    mod.log:error("cannot compile vr_options.lua: %s", tostring(err))
+    return
+  end
+
+  local options = chunk()
+  options.install(mod)
+-- Carrega as opções persistentes para o restante do mod.
+mod.exports.idioma_golpes =
+    mod.options:get("idioma_golpes")
+
+mod.exports.mostrar_inimigo =
+    mod.options:get("mostrar_inimigo")
+
+mod.exports.precos_linha =
+    mod.options:get("precos_linha")
+
+mod.exports.trainer_card =
+    mod.options:get("trainer_card")
+
   -- mod:read is the supported way into your own directory; the catalogs are
   -- plain Lua tables, so read and run them rather than require()ing them.
   local function catalog(name)
@@ -66,7 +99,10 @@ return function(mod)
       page.image = mod.assets:path(page.image)
     end
     mod.content.font:register(id, page)
-	--mod.content.font:register("ttf", {})
+	-- mod.content.font:register("ttf", {
+    -- file = mod.assets:path("assets/fonts/plainpixel/Prop10.ttf"),
+    -- size = 10,
+    --})
   end
   -- charmap: which byte sequence draws which code
   for seq, code in pairs(catalog("charmap")) do
@@ -75,6 +111,9 @@ return function(mod)
 
   -- ---- text ---------------------------------------------------------
   local counts = {}
+  counts.dialogue = each("pokedex_redblue", function(id, value)
+  mod.content.text:override(id, value)
+  end)
   counts.dialogue = each("dialogue", function(id, value)
     mod.content.text:override(id, value)
   end)
@@ -84,41 +123,29 @@ return function(mod)
   counts.species = each("species_names", function(id, value)
     mod.content.pokemon:patch(id, { name = value })
   end)
-  counts.moves = each("move_names", function(id, value)
-    mod.content.moves:patch(id, { name = value })
-  end)
-  counts.items = each("item_names", function(id, value)
-    mod.content.items:patch(id, { name = value })
-  end)
-  counts.trainers = each("trainer_names", function(id, value)
-    mod.content.trainers:patch(id, { name = value })
-  end)
-  counts.statuses = each("status_labels", function(id, value)
-    mod.content.statuses:patch(id, { label = value })
-  end)
+  
+ --- =========================================
+ --- OPTION, MOSTRAR OU NÂO INIMIGO + USED NA LINHA DEBAIXO
+ --- =========================================
+  local mostrarInimigo = mod.options:get("mostrar_inimigo")
+if mostrarInimigo then
+  mod.content.strings:override("Enemy %s", "%s inimigo ")
+  mod.content.strings:override("%s\nused %s!", "%s\nusou %s!")
+else
+  mod.content.strings:override("Enemy %s", "%s")
+  mod.content.strings:override("%s\nused %s!", "%s usou\n%s!")
+end
+ 
+--- =========================================
+-- CHANGE MOVE LANGUAGES (PT-BR = on / EN = off
+--- =========================================
+local idioma = mod.options:get("idioma_golpes")
 
-  -- ---- name entry ---------------------------------------------------
-  -- The naming screen's letter grid.  Leave lang/naming.lua returning nil
-  -- to keep the English alphabet.
-  -- The mod-facing hook surface is :wrap(name, callback, priority); the
-  -- generated template calls :on, which does not exist and only blows up
-  -- once lang/naming.lua is actually filled in.
- -- local grid = catalog("naming")
- -- if grid.upper or grid.lower then
- --  mod.hooks:wrap("ui.naming.grid", function(base, ctx)
- --     local want = ctx and ctx.lower and grid.lower or grid.upper
- --     return want or base
- --   end)
- -- end
+if idioma == "portuguese1" then
 
-  mod.events:on("game.ready", function()
-    local total = 0
-    for _, n in pairs(counts) do total = total + n end
-    mod.log:info("Português: %d strings traduzidas", total)
-  end)
-
-
-
+    counts.moves = each("move_names", function(id, value)
+        mod.content.moves:patch(id, { name = value })
+    end)
 --------------------------------------------------------------
 ----------------------BATTLE UI
 --------------------------------------------------------------
@@ -165,9 +192,18 @@ BattleState.drawTextArea = function(self, ...)
             x = 08
             y = 128		
 	--CURSORES DE MIMIC
+	
+			
         end
+		
+		
+		
+		
+		
+
         return oldDrawCode(code, x, y, ...)
     end
+--
 	Font.drawBox = function(x, y, w, h, ...)
 		
 --MOVELIST BOX Font.drawBox(4, 12, 16, 6)			
@@ -270,10 +306,69 @@ MoveLearnMenu.draw = function(self, ...)
     end
 
     return a, b, c, d, e
+end
+
+
+
+
+elseif idioma == "english" then
+
+    each("engmoves_dialogue", function(id, value)
+        mod.content.text:override(id, value)
+    end)
+
+    each("engmoves_strings", function(source, value)
+        mod.content.strings:override(source, value)
+    end)
+
+
+
+
+
+
+--elseif idioma == "portuguese2" then
+--    counts.moves = each("move_names2", function(id, value)
+--        mod.content.moves:patch(id, { name = value })
+--    end)
 
 end
 
--------------------------------------------------------------------
+
+
+  
+  
+ ------------ 
+  counts.items = each("item_names", function(id, value)
+    mod.content.items:patch(id, { name = value })
+  end)
+  counts.trainers = each("trainer_names", function(id, value)
+    mod.content.trainers:patch(id, { name = value })
+  end)
+  counts.statuses = each("status_labels", function(id, value)
+    mod.content.statuses:patch(id, { label = value })
+  end)
+
+  -- ---- name entry ---------------------------------------------------
+  -- The naming screen's letter grid.  Leave lang/naming.lua returning nil
+  -- to keep the English alphabet.
+  -- The mod-facing hook surface is :wrap(name, callback, priority); the
+  -- generated template calls :on, which does not exist and only blows up
+  -- once lang/naming.lua is actually filled in.
+ -- local grid = catalog("naming")
+ -- if grid.upper or grid.lower then
+ --  mod.hooks:wrap("ui.naming.grid", function(base, ctx)
+ --     local want = ctx and ctx.lower and grid.lower or grid.upper
+ --     return want or base
+ --   end)
+ -- end
+
+  mod.events:on("game.ready", function()
+    local total = 0
+    for _, n in pairs(counts) do total = total + n end
+    mod.log:info("Português: %d strings traduzidas", total)
+  end)
+  
+ -------------------------------------------------------------------
  --TABELA DE TIPOS
  -------------------------------------------------------------------
  -- Injected: localized type display names from generated lang/type_names.lua
@@ -314,6 +409,26 @@ end
       end
     end
   end
+
+  
+
+--- =========================================
+  -- Injected: versioned catalogs for Pokémon Yellow.
+--- =========================================
+  local okGame, GameVersion = pcall(require, "src.core.GameVersion")
+  local yellow_game_version = okGame and type(GameVersion) == "table"
+      and type(GameVersion.isYellow) == "function"
+      and GameVersion.isYellow()
+  if yellow_game_version then
+    each("dialogue_yellow", function(id, value) mod.content.text:override(id, value) end)
+    each("pokedex_yellow", function(id, value) mod.content.text:override(id, value) end)
+  end
+  
+  
+ 
+  
+  
+  
 --- =========================================
   -- Traduções Literais
 --- ========================================= 
@@ -332,6 +447,9 @@ end
 local oldTrainerCardDraw = TrainerCard.draw
 
 TrainerCard.draw = function(self, ...)
+    if not mod.exports.trainer_card then
+        return oldTrainerCardDraw(self, ...)
+    end
 
     local oldDraw = Font.draw
     local oldGfxDraw = love.graphics.draw
@@ -374,7 +492,7 @@ TrainerCard.draw = function(self, ...)
         elseif x == 56 and y == 72 then
             oldDraw(
                 Strings("BADGES"),
-                40, 73, ...
+                40, 72, ...
             )
 
         else
@@ -391,23 +509,14 @@ TrainerCard.draw = function(self, ...)
 
             if x == 48 and y == 72 then
                 args[1] = 32
-                args[2] = 72
+                args[2] = 70
 
             elseif x == 104 and y == 72 then
                 args[1] = 112
-                args[2] = 72
+                args[2] = 70
             end
 
-        elseif image == self.faces.img or image == self.badges.img then
-            local x = args[2]
-            local y = args[3]
-
-            if x and y then
-                local row = math.floor((y - 100) / 24)
-
-                args[2] = x + 4
-                args[3] = 97 + row * 22
-            end
+        
         end
 
         return oldGfxDraw(image, unpack(args))
@@ -426,98 +535,129 @@ TrainerCard.draw = function(self, ...)
     return a, b, c, d, e
 end
 
---- =========================================
---- TITLE SCREEN VERSION LOGO
---- =========================================
- local TitleState = require("src.ui.TitleState")
+--------------------------------------------------------------
+----------------------BATTLE UI
+---------------------- BATTLE UI
+---------------------- BATTLE UI
+--------------------------------------------------------------
+local oldDrawTextArea = BattleState.drawTextArea
 
-local oldDraw = TitleState.draw
-
-TitleState.draw = function(self)
-  oldDraw(self)
-
-  if self.version
-     and not self.yellowLayout
-     and self.phase ~= "drop"
-     and self.phase ~= "settle" then
-
-    local iw, ih = self.version:getDimensions()
-    local rx = self.ribbonOffset or 0
-
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle(
-      "fill",
-      40 + rx,
-      64,
-      104,
-      8
-    )
-
-    if self.blue then
-      -- BLUE:
-      love.graphics.draw(
-        self.version,
-        love.graphics.newQuad(88, 0, 72, 8, iw, ih),
-        48 + rx,
-        64
-      )
-    else
-      -- RED:
-      love.graphics.draw(
-        self.version,
-        love.graphics.newQuad(0, 0, 88, 8, iw, ih),
-        40 + rx,
-        64
-      )
-    end
-  end
-
-  love.graphics.setColor(1, 1, 1, 1)
-end
---- =========================================
---- GAME CORNER BOX
---- =========================================
-    local Font = require("src.render.Font")
+BattleState.drawTextArea = function(self, ...)
     local oldDraw = Font.draw
+    local oldDrawCode = Font.drawCode
     local oldDrawBox = Font.drawBox
 
-    Font.draw = function(text, x, y, ...)
-        if text == Strings("MONEY") and x == 96 and y == 16 then
-            x = 88
-        elseif text == Strings("COIN") and x == 96 and y == 32 then
-            x = 88
+    -- Sequências reais dos textos
+    local fight = Font.encode(Strings("FIGHT", "battle"))
+    local item  = Font.encode(Strings("ITEM", "battle"))
+    local run   = Font.encode(Strings("RUN", "battle"))
+
+    Font.drawCode = function(code, x, y, ...)
+        -- =====================================================
+        -- FIGHT / ITEM / RUN
+        -- Só pode funcionar no menu normal de batalha.
+        -- =====================================================
+
+        if self.phase == "menu" and not self.safari then
+
+            -- FIGHT
+            if y == 112 then
+                for i, glyph in ipairs(fight) do
+                    if code == glyph and x == 80 + (i - 1) * 8 then
+                        x = x - 24
+                        break
+                    end
+                end
+            end
+
+            -- ITEM
+            if y == 128 then
+                for i, glyph in ipairs(item) do
+                    if code == glyph and x == 80 + (i - 1) * 8 then
+                        x = x - 24
+                        break
+                    end
+                end
+            end
+
+            -- RUN
+            if y == 128 then
+                for i, glyph in ipairs(run) do
+                    if code == glyph and x == 128 + (i - 1) * 8 then
+                        x = x - 16
+                        break
+                    end
+                end
+            end
+
+            -- =================================================
+            -- PKMN
+            -- =================================================
+
+            if code == 0xE1 and x == 128 and y == 112 then
+                x = 112
+
+            elseif code == 0xE2 and x == 136 and y == 112 then
+                x = 120
+            end
+
+            -- =================================================
+            -- CURSORES DE BATALHA
+            -- =================================================
+
+            if code == 0xED and x == 72 and y == 112 then
+                x = 48
+
+            elseif code == 0xED and x == 120 and y == 112 then
+                x = 104
+
+            elseif code == 0xED and x == 72 and y == 128 then
+                x = 48
+
+            elseif code == 0xED and x == 120 and y == 128 then
+                x = 104
+            end
         end
-        return oldDraw(text, x, y, ...)
+
+        return oldDrawCode(code, x, y, ...)
     end
+
+    -- =========================================================
+    -- FIGHT / PKMN / ITEM / RUN BOX
+    -- =========================================================
 
     Font.drawBox = function(x, y, w, h, ...)
-        if x == 11 and y == 0 and w == 9 and h == 7 then
-            w = 10
-			x = 10
+        if self.phase == "menu"
+            and not self.safari
+            and x == 8
+            and y == 12
+            and w == 12
+            and h == 6 then
+
+            x = 5
+            w = 15
         end
+
         return oldDrawBox(x, y, w, h, ...)
     end
---- =========================================
---- METRIC POKéDEX
---- =========================================
-local DexExtra = catalog("dex_extra")
 
-local DexEntryMenu = require("src.ui.DexEntryMenu")
-local oldDexEntryNew = DexEntryMenu.new
+    local ok, a, b, c, d, e = pcall(oldDrawTextArea, self, ...)
 
-DexEntryMenu.new = function(game, speciesOrOpts, onDone)
-    for species, extra in pairs(DexExtra) do
-        local pokemon = game.data.pokemon[species]
+    -- Restaura as funções originais
+    Font.drawBox = oldDrawBox
+    Font.draw = oldDraw
+    Font.drawCode = oldDrawCode
 
-        if pokemon and pokemon.dexEntry then
-            pokemon.dexEntry.heightM = extra.heightM
-            pokemon.dexEntry.weightKg = extra.weightKg
-        end
+    if not ok then
+        error(a)
     end
-    return oldDexEntryNew(game, speciesOrOpts, onDone)
+
+    return a, b, c, d, e
 end
+
+
 ----------------------------------------
---INVENTÁRIO -
+--INVENTÁRIO - QUEBRA DE LINHA
 ----------------------------------------
 local oldListMenuDraw = ListMenu.draw
 
@@ -583,6 +723,8 @@ end
 
     return a, b, c, d, e
 end
+
+
 -------------
 mod.hooks:wrap("ui.party.submenu", function(next, game, items, mon, ctx)
     local result = next(game, items, mon, ctx)
@@ -631,10 +773,172 @@ OverworldState.nurseHeal = function(self, onDone, npc)
     return a, b, c, d, e
 end
 
+------------------
+------------------
+ -- local TitleState = require("src.ui.TitleState")
+
+-- local oldDraw = TitleState.draw
+
+-- TitleState.draw = function(self)
+  -- oldDraw(self)
+
+  -- if self.version
+     -- and not self.yellowLayout
+     -- and self.phase ~= "drop"
+     -- and self.phase ~= "settle" then
+
+    -- local iw, ih = self.version:getDimensions()
+    -- local rx = self.ribbonOffset or 0
+
+    -- love.graphics.setColor(1, 1, 1, 1)
+    -- love.graphics.rectangle(
+      -- "fill",
+      -- 40 + rx,
+      -- 64,
+      -- 104,
+      -- 8
+    -- )
+
+    -- if self.blue then
+     -- BLUE:
+     -- antigo: 0,0,64,8  -> 56,64
+     -- novo:   88,0,72,8  -> 48,64
+      -- love.graphics.draw(
+        -- self.version,
+        -- love.graphics.newQuad(88, 0, 72, 8, iw, ih),
+        -- 48 + rx,
+        -- 64
+      -- )
+    -- else
+     -- RED:
+     -- antigo: dois pedaços
+     -- novo: um pedaço contínuo
+      -- love.graphics.draw(
+        -- self.version,
+        -- love.graphics.newQuad(0, 0, 88, 8, iw, ih),
+        -- 40 + rx,
+        -- 64
+      -- )
+    -- end
+  -- end
+
+  -- love.graphics.setColor(1, 1, 1, 1)
+-- end
+
+--yellow
+-------------
+-- local TitleState = require("src.ui.TitleState")
+
+-- local oldNew = TitleState.new
+
+-- TitleState.new = function(game, opts)
+  -- local self = oldNew(game, opts)
+
+  -- if self.yellow then
+    -- local ok, logo = pcall(
+      -- love.graphics.newImage,
+      -- mod.assets:path("assets/title/yellow_logo.png")
+    -- )
+
+    -- if ok and logo then
+      -- logo:setFilter("nearest", "nearest")
+      -- self.logo = logo
+    -- end
+--  end
+
+--  if self.yellow then
+--    local ok, bubble = pcall(
+--      love.graphics.newImage,
+--      mod.assets:path("assets/title/pika_bubble.png")
+--    )
+
+--   if ok and bubble then
+--      bubble:setFilter("nearest", "nearest")
+--      self.yellowBubble = bubble
+--    end
+--  end
 
 
+--  return self
+--end
 
+ 
+------------------
 
+    local Font = require("src.render.Font")
+    local oldDraw = Font.draw
+    local oldDrawBox = Font.drawBox
 
----
+    Font.draw = function(text, x, y, ...)
+        if text == Strings("MONEY") and x == 96 and y == 16 then
+            x = 88
+        elseif text == Strings("COIN") and x == 96 and y == 32 then
+            x = 88
+        end
+
+        return oldDraw(text, x, y, ...)
+    end
+
+    Font.drawBox = function(x, y, w, h, ...)
+        if x == 11 and y == 0 and w == 9 and h == 7 then
+            w = 10
+			x = 10
+        end
+
+        return oldDrawBox(x, y, w, h, ...)
+    end
+
+------------------
+--rename ROCKET to TEAM ROCKET
+------------------
+local oldBattleSay = BattleState.say
+local oldBattleSayNext = BattleState.sayNext
+
+local function replaceRocketName(self, text)
+  local index = self.partyIndex or 1
+
+  if self.oppClass == "OPP_ROCKET"
+     and index >= 42 -- JESSIE & JAMES
+     and index <= 45 -- JESSIE & JAMES
+     and type(text) == "string" then
+
+    local newName = "EQUIPE ROCKET" --or JESSIE&JAMES
+
+    if not text:find(newName, 1, true) then
+      text = text:gsub("ROCKET", newName)
+    end
+  end
+
+  return text
+end
+
+BattleState.say = function(self, text, ...)
+  text = replaceRocketName(self, text)
+  return oldBattleSay(self, text, ...)
+end
+
+BattleState.sayNext = function(self, text, ...)
+  text = replaceRocketName(self, text)
+  return oldBattleSayNext(self, text, ...)
+end
+------------------
+local DexExtra = catalog("dex_extra")
+
+local DexEntryMenu = require("src.ui.DexEntryMenu")
+local oldDexEntryNew = DexEntryMenu.new
+
+DexEntryMenu.new = function(game, speciesOrOpts, onDone)
+    for species, extra in pairs(DexExtra) do
+        local pokemon = game.data.pokemon[species]
+
+        if pokemon and pokemon.dexEntry then
+            pokemon.dexEntry.heightM = extra.heightM
+            pokemon.dexEntry.weightKg = extra.weightKg
+        end
+    end
+
+    return oldDexEntryNew(game, speciesOrOpts, onDone)
+end
+
+------------------
 end
